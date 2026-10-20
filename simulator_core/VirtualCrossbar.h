@@ -28,6 +28,12 @@ public:
     std::size_t cols() const { return cols_; }
     const std::string& name() const { return name_; }
 
+    // Ideal, noise-free forward pass (implemented in VirtualCrossbarInference.cpp).
+    // Computes the column sums y[c] = sum_r input[r] * W[r][c], i.e. y = x @ W,
+    // which is what each bit line of the crossbar accumulates.
+    // input must have rows() entries, each +1 or -1; the result has cols() entries.
+    std::vector<int32_t> forward(const std::vector<int8_t>& input) const;
+
     // Prints the top-left (sampleRows x sampleCols) corner of the array.
     void printSample(std::size_t sampleRows, std::size_t sampleCols) const;
 
@@ -40,5 +46,9 @@ private:
     std::size_t cols_;
     std::vector<int8_t> cells_;  // row-major, contiguous
 };
+
+// Sign comparator applied between layers: +1 if y >= 0 else -1 (sign(0) -> +1),
+// matching the training script's convention.
+std::vector<int8_t> signActivation(const std::vector<int32_t>& preActivations);
 
 #endif  // VIRTUAL_CROSSBAR_H

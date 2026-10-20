@@ -8,5 +8,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_executable(bnn_sim main.cpp VirtualCrossbar.cpp)
+add_executable(bnn_sim
+    main.cpp
+    VirtualCrossbar.cpp
+    VirtualCrossbarInference.cpp
+    CsvUtils.cpp
+)
 target_compile_options(bnn_sim PRIVATE -Wall -Wextra -Wpedantic)

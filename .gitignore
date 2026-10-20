@@ -1,0 +1,10 @@
+# Build outputs
+build/
+simulator_core/build/
+*.o
+
+# Python environment & datasets
+.venv/
+__pycache__/
+data/
+PythonProject/data/

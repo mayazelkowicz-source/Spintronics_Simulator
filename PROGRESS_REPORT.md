@@ -31,7 +31,7 @@ This document tracks the development milestones of the Binarized Neural Network 
 * **Virtual Crossbar Infrastructure:** Developed the `VirtualCrossbar` C++ class, creating an efficient 2D array data structure to simulate the memory device layout.
 * **Data Mapping:** Implemented file-parsing mechanisms to load and map the extracted binary CSV weights directly into the virtual MTJ crossbar matrix.
 * **Ideal Forward Pass:** Implemented matrix-vector multiplication (dot product) and sign activation functions for multi-layer inference.
-* **Verification:** Built a regression testing suite (`main.cpp`) that processes the 100 golden test vectors through the C++ simulator. The simulator achieved a 100% computational match with the PyTorch baseline and successfully classified 96/100 images under ideal, noise-free conditions.
+* **Verification:** Built a regression testing suite (`main.cpp`) that processes the 100 golden test vectors through the C++ simulator. The simulator achieved a 100% computational match with the golden reference model and successfully classified 96/100 images under ideal, noise-free conditions.
 
 ## Next Steps (Milestone 3)
 

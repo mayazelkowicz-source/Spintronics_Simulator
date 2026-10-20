@@ -8,3 +8,6 @@ simulator_core/build/
 __pycache__/
 data/
 PythonProject/data/
+
+# Internal project memory (local only)
+PROJECT_STATE.md

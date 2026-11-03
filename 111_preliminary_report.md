@@ -8,7 +8,7 @@
 |---|---|
 | **Group Number** | **111** |
 | **Team Members** | Maya Zelkowicz (maya.zelkowicz@mail.huji.ac.il)<br>Sarit Mishiev (sarit.mishiev@mail.huji.ac.il) |
-| **Mentor** | Daniella (daniellah@gmail.com) |
+| **Mentor** | Daniella Har Shalom (daniellah@gmail.com) |
 | **Advisor** | Dr. Amir Capua (amir.capua@mail.huji.ac.il) |
 | **Organization** | HUJI Spintronics Lab, The Hebrew University of Jerusalem |
 | **Git Repository** | https://github.com/mayazelkowicz-source/Spintronics_Simulator |

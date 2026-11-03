@@ -7,3 +7,4 @@ simulator_core/build/
 .venv/
 __pycache__/
 data/
+full_test/

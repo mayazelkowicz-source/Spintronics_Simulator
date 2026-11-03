@@ -4,7 +4,7 @@
 // checks the logits bit-exactly against the reference produced by the training
 // script (numpy_golden_inference in main.py).
 //
-// Usage: bnn_sim [layer1.csv] [layer2.csv]
+// Usage: bnn_sim [layer1.csv] [layer2.csv] [test_dir]
 // Defaults assume the binary is run from the project root.
 
 #include <algorithm>
@@ -50,6 +50,7 @@ std::size_t argmax(const std::vector<int32_t>& v) {
 int main(int argc, char* argv[]) {
     const std::string layer1Path = argc > 1 ? argv[1] : "layer1_weights_bin.csv";
     const std::string layer2Path = argc > 2 ? argv[2] : "layer2_weights_bin.csv";
+    const std::string testDir = argc > 3 ? std::string(argv[3]) + "/" : "";
 
     try {
         VirtualCrossbar layer1("Layer1", kInputSize, kHiddenSize);
@@ -59,9 +60,9 @@ int main(int argc, char* argv[]) {
         loadAndReport(layer2, layer2Path);
         std::cout << "All crossbars loaded successfully.\n\n";
 
-        const auto inputs = readIntCsv(kTestInputsPath);
-        const auto expected = readIntCsv(kExpectedLogitsPath);
-        const auto labels = readIntCsv(kTestLabelsPath);
+        const auto inputs = readIntCsv(testDir + kTestInputsPath);
+        const auto expected = readIntCsv(testDir + kExpectedLogitsPath);
+        const auto labels = readIntCsv(testDir + kTestLabelsPath);
         if (expected.size() != inputs.size() || labels.size() != inputs.size()) {
             throw std::runtime_error("test files have mismatched sample counts");
         }

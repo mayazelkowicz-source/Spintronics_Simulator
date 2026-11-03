@@ -1,7 +1,7 @@
 # Simulating an energy-efficient In-Memory Compute AI accelerator by mapping Binarized Neural Networks to Spintronic MTJ arrays
 
 Group 111: Maya Zelkowicz, Sarit Mishiev
-Advisor: Dr. Amir Capua, HUJI Spintronics Lab. Mentor: Daniella.
+Advisor: Dr. Amir Capua, HUJI Spintronics Lab. Mentor: Daniella Har Shalom.
 
 This repository contains a simulator for running a Binarized Neural Network (BNN) on virtual Magnetic Tunnel Junction (MTJ) crossbar arrays. Weights and activations are restricted to +1 and -1. The current version performs ideal (noise-free) inference. Later stages will add MTJ device models and noise injection, to study how device physics affects classification accuracy.
 

@@ -32,21 +32,7 @@ Running Artificial Intelligence (AI) on battery-powered edge devices is limited 
 - **Hirtzlin et al.** [7] simulated BNNs on spin-torque MRAM by injecting weight errors at given bit-error rates. Rates up to 0.1% had little effect on accuracy, allowing cheaper cells without error correction.
 - **NeuroSim** [8] and **IBM AIHWKit** [9] are general analog-crossbar simulators, mainly for resistive and phase-change memories.
 
-**Our position.** Like [7], our behavioral simulator represents device physics as statistical errors and noise injected during inference. We take the error rates and noise levels from LLG/STT models and HUJI Spintronics Lab measurements, adding read noise and resistance variation. How current and resistance summation [6] scale with array size is an analytical question we will explore, not a built-in feature.
-
-**References**
-
-1. S. Yuasa et al., "Giant room-temperature magnetoresistance in single-crystal Fe/MgO/Fe magnetic tunnel junctions," *Nature Materials* 3, 868 (2004). https://doi.org/10.1038/nmat1257
-2. M. Althammer et al., "Spin Pumping," in K. Sato and E. Saitoh (eds.), *Spintronics for Next Generation Innovative Devices*, Wiley (2015). https://doi.org/10.1002/9781118751886
-3. D. C. Ralph and M. D. Stiles, "Spin transfer torques," *Journal of Magnetism and Magnetic Materials* 320, 1190 (2008). https://doi.org/10.1016/j.jmmm.2007.12.019
-4. M. Courbariaux, I. Hubara et al., "Binarized Neural Networks: Training Deep Neural Networks with Weights and Activations Constrained to +1 or -1," arXiv (2016). https://arxiv.org/abs/1602.02830
-5. M. Rastegari et al., "XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks," ECCV (2016). https://arxiv.org/abs/1603.05279
-6. S. Jung et al., "A crossbar array of magnetoresistive memory devices for in-memory computing," *Nature* 601, 211 (2022). https://doi.org/10.1038/s41586-021-04196-6
-7. T. Hirtzlin et al., "Implementing Binarized Neural Networks with Magnetoresistive RAM without Error Correction," IEEE/ACM NANOARCH (2019). https://arxiv.org/abs/1908.04085
-8. P.-Y. Chen, X. Peng and S. Yu, "NeuroSim: A Circuit-Level Macro Model for Benchmarking Neuro-Inspired Architectures in Online Learning," *IEEE TCAD* 37(12), 3067 (2018). https://doi.org/10.1109/TCAD.2018.2789723
-9. M. J. Rasch et al., "A Flexible and Fast PyTorch Toolkit for Simulating Training and Inference on Analog Crossbar Arrays," IEEE AICAS (2021). https://arxiv.org/abs/2104.02184
-10. M. Hu et al., "Dot-Product Engine for Neuromorphic Computing: Programming 1T1M Crossbar to Accelerate Matrix-Vector Multiplication," DAC (2016). https://doi.org/10.1145/2897937.2898010
-11. M. Horowitz, "Computing's energy problem (and what we can do about it)," IEEE ISSCC (2014). https://doi.org/10.1109/ISSCC.2014.6757323
+**Our position.** Like [7], our behavioral simulator represents device physics as statistical errors and noise injected during inference. We take the error rates and noise levels from LLG/STT models and HUJI Spintronics Lab measurements, adding read noise and resistance variation. We will also analyze how current and resistance summation [6] scale with array size.
 
 ## 3. Proposed Solution
 
@@ -64,8 +50,6 @@ Running Artificial Intelligence (AI) on battery-powered edge devices is limited 
 
 We choose **Alternative 3**: each point of a noise-parameter sweep needs inference on the full 10,000-image test set over many seeds, which is practical only with a fast behavioral model. Lab measurements and published circuit-level results [10] reduce calibration risk.
 
-<div style="page-break-after: always;"></div>
-
 ### Key components
 
 ![Figure 1 – LLG magnetization dynamics: precession of M around H_eff with damping; (c) spin current exchanged with an adjacent layer, the reciprocal of STT.](report_figures/fig1_llg_precession_damping_saitoh.png)
@@ -79,7 +63,7 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 *Figure 2 – Component diagram of the proposed simulator.*
 
 1. **BNN Training:** ±1 weights and *golden reference* data (trusted inputs, outputs, labels).
-2. **Weight Mapper:** maps +1 to P and −1 to AP.
+2. **Weight Mapper:** maps +1 to P and −1 to AP. A reference column or P/AP differential pairs remove the input-dependent current offset, so the comparator recovers the signed sum.
 3. **MTJ Crossbar (C++ `VirtualCrossbar`):** inputs drive word lines; bit lines sum currents.
 4. **Noise Injector:** resistance variation, read noise, physics-based bit flips.
 5. **Sense & Activate:** sign() between layers; argmax over the ten outputs gives the predicted digit.
@@ -109,19 +93,19 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 ### Required knowledge
 
 - **Literature:** Cullity (magnetic materials); Gurevich and Melkov (magnetization dynamics); Fabian, Žutić et al. (spin transport); [2, 3, 7]; Sze et al. (2017).
-- **Courses:** Dr. Amir Capua's Spintronics reading course; Computer Architecture; Machine Learning; MIT 6.5930 (online).
+- **Courses:** Dr. Amir Capua's Spintronics reading course (LLG dynamics, spin currents, STT); Computer Architecture; Machine Learning; MIT 6.5930 *Hardware Architecture for Deep Learning* (online).
 
 ## 4. Evaluation and Verification Scheme
 
 **Persona.** A device researcher at the HUJI Spintronics Lab asking: *"Is our measured MTJ stack good enough for AI inference, and which parameter must improve?"*
 
 **Verification (correctness).**
-- With noise disabled, logits must match the golden reference exactly on the full **10,000-image** MNIST test set (already achieved on 100 images).
+- With noise disabled, the integer model must match the golden logits exactly on the full **10,000-image** MNIST test set (achieved on 100 images), and the conductance model must predict the same class for every image.
 - Unit tests check each physical model against analytical limits (e.g., zero temperature gives zero flips).
 
 **Evaluation (quantitative targets).**
-- **Robustness:** accuracy drop **below 5 percentage points** relative to the ideal BNN under lab-calibrated noise.
-- **Sensitivity sweeps:** bit-error rate 0–10% and resistance variation 0–20%; each point averaged over **at least 30 random seeds**, with 95% confidence intervals.
+- **Robustness:** accuracy drop **below 5 percentage points** relative to the ideal BNN under lab-calibrated or published-parameter noise.
+- **Sensitivity sweeps:** bit-error rate 0–10% and resistance variation 0–20%; each point averaged over **at least 30 seeds**, with 95% confidence intervals.
 - **Energy:** Joules per inference from cell read energy (V²·G·t) plus sensing overhead, compared with a Von Neumann baseline from published operation and memory-access energies [11]. Projected target: at least 10× lower, to be confirmed by our model.
 - **Latency:** crossbar read cycles per inference versus sequential multiply-accumulate operations.
 - **Simulator speed:** full test set in **under 60 seconds** on a laptop.
@@ -140,10 +124,10 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 **"Bike", March–April 2027 (essential):**
 - Physics-derived noise: thermal stability, STT switching probability, read disturb.
 - Energy and latency models.
-- *Nice-to-have:* tiling with an IR-drop approximation.
+- *Nice-to-have:* tiling with an IR-drop approximation; analytical comparison of current and resistance summation.
 
-**"Car", May–June 2027 (nice-to-have, except the final evaluation, which is essential):**
-- *Essential:* final evaluation against the targets in Section 4.
+**"Car", May–June 2027:**
+- *Essential:* final evaluation against the targets in Section 4; basic device-requirement map from lab or published parameters.
 - *Nice-to-have:* lab-calibrated device-requirement map; Fashion-MNIST; comparison with NeuroSim; noise-aware retraining.
 
 **Responsibilities:** Maya Zelkowicz leads physical and noise modeling and machine learning; Sarit Mishiev leads C++ engine architecture and optimization; evaluation is joint.
@@ -152,3 +136,17 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 
 - **Notion** (https://app.notion.com/p/Spintronics-Lab-Simulating-an-energy-efficient-In-Memory-Compute-AI-accelerator-ce5240c4d77d83e7a51d818497730381): project timeline, task assignments per member, requirement tracking and weekly progress updates.
 - **Git** (https://github.com/mayazelkowicz-source/Spintronics_Simulator): all code is versioned on GitHub. Each member commits their own work with descriptive messages, and the README documents setup and run instructions. Regression testing is manual: before pushing, we run the C++ test and confirm exact agreement with the golden reference.
+
+## References
+
+1. S. Yuasa et al., "Giant room-temperature magnetoresistance in single-crystal Fe/MgO/Fe magnetic tunnel junctions," *Nature Materials* 3, 868 (2004). https://doi.org/10.1038/nmat1257
+2. M. Althammer et al., "Spin Pumping," in K. Sato and E. Saitoh (eds.), *Spintronics for Next Generation Innovative Devices*, Wiley (2015). https://doi.org/10.1002/9781118751886
+3. D. C. Ralph and M. D. Stiles, "Spin transfer torques," *Journal of Magnetism and Magnetic Materials* 320, 1190 (2008). https://doi.org/10.1016/j.jmmm.2007.12.019
+4. M. Courbariaux, I. Hubara et al., "Binarized Neural Networks: Training Deep Neural Networks with Weights and Activations Constrained to +1 or -1," arXiv (2016). https://arxiv.org/abs/1602.02830
+5. M. Rastegari et al., "XNOR-Net: ImageNet Classification Using Binary Convolutional Neural Networks," ECCV (2016). https://arxiv.org/abs/1603.05279
+6. S. Jung et al., "A crossbar array of magnetoresistive memory devices for in-memory computing," *Nature* 601, 211 (2022). https://doi.org/10.1038/s41586-021-04196-6
+7. T. Hirtzlin et al., "Implementing Binarized Neural Networks with Magnetoresistive RAM without Error Correction," IEEE/ACM NANOARCH (2019). https://arxiv.org/abs/1908.04085
+8. P.-Y. Chen, X. Peng and S. Yu, "NeuroSim: A Circuit-Level Macro Model for Benchmarking Neuro-Inspired Architectures in Online Learning," *IEEE TCAD* 37(12), 3067 (2018). https://doi.org/10.1109/TCAD.2018.2789723
+9. M. J. Rasch et al., "A Flexible and Fast PyTorch Toolkit for Simulating Training and Inference on Analog Crossbar Arrays," IEEE AICAS (2021). https://arxiv.org/abs/2104.02184
+10. M. Hu et al., "Dot-Product Engine for Neuromorphic Computing: Programming 1T1M Crossbar to Accelerate Matrix-Vector Multiplication," DAC (2016). https://doi.org/10.1145/2897937.2898010
+11. M. Horowitz, "Computing's energy problem (and what we can do about it)," IEEE ISSCC (2014). https://doi.org/10.1109/ISSCC.2014.6757323

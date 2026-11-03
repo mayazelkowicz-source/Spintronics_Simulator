@@ -72,7 +72,7 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 ### Solution feasibility
 
 - **Algorithm:** our PyTorch BNN (784-256-10) reaches **94.30%** test accuracy on MNIST (Modified National Institute of Standards and Technology handwritten digits).
-- **Simulator core:** C++ ideal inference reproduces the golden *logits* (raw per-class scores) exactly on 100 test images.
+- **Simulator core:** C++ ideal inference reproduces the golden *logits* (raw per-class scores) exactly on all 10,000 test images.
 - **Prototyping:** Python and C++ exchange CSV files, so retrained models need no code changes.
 - **Modularity:** the code is split into loading, crossbar and activation parts; noise models will be added behind a common interface.
 
@@ -100,7 +100,7 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 **Persona.** A device researcher at the HUJI Spintronics Lab asking: *"Is our measured MTJ stack good enough for AI inference, and which parameter must improve?"*
 
 **Verification (correctness).**
-- With noise disabled, the integer model must match the golden logits exactly on the full **10,000-image** MNIST test set (achieved on 100 images), and the conductance model must predict the same class for every image.
+- With noise disabled, the integer model must match the golden logits exactly on the full **10,000-image** MNIST test set (achieved), and the conductance model must predict the same class for every image.
 - Unit tests check each physical model against analytical limits (e.g., zero temperature gives zero flips).
 
 **Evaluation (quantitative targets).**

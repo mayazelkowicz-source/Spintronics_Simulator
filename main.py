@@ -8,7 +8,7 @@ Training     : Straight-Through Estimator (STE) on latent float weights.
 Export       : binarized weight matrices -> CSV (crossbar layout), plus a
                numpy integer-only "golden model" check and test vectors.
 
-Run:  python train_bnn_mnist.py
+Run:  python3 main.py
 """
 
 import math

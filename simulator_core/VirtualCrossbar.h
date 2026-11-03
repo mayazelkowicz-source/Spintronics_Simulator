@@ -9,7 +9,7 @@
 // A 2D array of memory cells, each holding a binary weight in {+1, -1}.
 //
 // Layout follows the crossbar convention used by the training export
-// (PythonProject/main.py): rows = input lines (word lines), columns = output
+// (main.py): rows = input lines (word lines), columns = output
 // lines (bit lines). Cell (r, c) holds W[c][r] of the corresponding nn.Linear.
 class VirtualCrossbar {
 public:

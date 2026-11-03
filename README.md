@@ -1,64 +1,56 @@
 # Simulating an energy-efficient In-Memory Compute AI accelerator by mapping Binarized Neural Networks to Spintronic MTJ arrays
 
-**Group 111** — Maya Zelkowicz & Sarit Mishiev
-Advisor: Dr. Amir Capua, HUJI Spintronics Lab · Mentor: Daniella
+Group 111: Maya Zelkowicz, Sarit Mishiev
+Advisor: Dr. Amir Capua, HUJI Spintronics Lab. Mentor: Daniella.
 
-A hardware-aware simulator that runs a Binarized Neural Network (BNN, weights and activations in {+1, −1}) on virtual Magnetic Tunnel Junction (MTJ) crossbar arrays. The goal is to measure how much accuracy survives realistic MTJ physics (thermal noise, switching errors, resistance variation) and how much energy in-memory computing saves.
+This repository contains a simulator for running a Binarized Neural Network (BNN) on virtual Magnetic Tunnel Junction (MTJ) crossbar arrays. Weights and activations are restricted to +1 and -1. The current version performs ideal (noise-free) inference. Later stages will add MTJ device models and noise injection, to study how device physics affects classification accuracy.
 
-## Repository layout
+## Repository contents
 
-| Path | Contents |
-|---|---|
-| `main.py` | PyTorch BNN training on MNIST and weight/test-vector export |
-| `layer1_weights*.csv`, `layer2_weights*.csv` | Exported binary weight matrices |
-| `test_inputs_pm1.csv`, `test_expected_logits.csv`, `test_labels.csv` | Golden reference test vectors (first 100 MNIST test images) |
-| `simulator_core/` | C++17 simulator: `VirtualCrossbar`, ideal forward pass, regression test |
-| `PROGRESS_REPORT.md` | Milestone progress report |
-| `111_preliminary_report.md` / `.pdf` | Milestone 1 report |
+- `main.py`: trains the BNN on MNIST with PyTorch and exports the weights and test vectors.
+- `layer1_weights.csv`, `layer2_weights.csv`: binarized weights, values +1/-1.
+- `layer1_weights_bin.csv`, `layer2_weights_bin.csv`: the same weights in 0/1 encoding (1 = +1, 0 = -1).
+- `test_inputs_pm1.csv`, `test_expected_logits.csv`, `test_labels.csv`: reference test vectors for the first 100 MNIST test images.
+- `simulator_core/`: C++17 simulator (crossbar data structure, ideal forward pass, regression test).
+- `111_preliminary_report.md`, `111_preliminary_report.pdf`: Milestone 1 report.
+- `PROGRESS_REPORT.md`: milestone summary.
 
-## 1. Train the BNN and export weights (`main.py`)
+## 1. Training the BNN (`main.py`)
 
-### Requirements
-
-- Python 3.9+
-- PyTorch, torchvision, NumPy
+Requirements: Python 3.9 or newer, PyTorch, torchvision, NumPy.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install torch torchvision numpy
-```
-
-### Run
-
-```bash
 python3 main.py
 ```
 
-What it does:
+The script performs the following steps:
 
-1. **Downloads MNIST** into `./data/` (about 60 MB; ignored by Git).
-2. **Trains** a 784 → 256 → 10 binarized multilayer perceptron for 20 epochs (batch 128, Adam, cosine learning-rate schedule, seed 0). Weights, inputs and hidden activations are strictly ±1; the non-differentiable sign() is trained with a Straight-Through Estimator. There is no bias and no BatchNorm, so each layer maps 1:1 onto a crossbar. It uses a GPU if one is available, otherwise the CPU.
-3. **Exports the binarized weights** in crossbar layout (rows = inputs/word lines, columns = outputs/bit lines):
-   - `layerN_weights.csv` — values in {+1, −1}
-   - `layerN_weights_bin.csv` — 0/1 encoding (+1 → 1, −1 → 0), e.g. for P/AP state mapping
-   - Shapes: layer 1 is 784 × 256, layer 2 is 256 × 10.
-4. **Checks the CSVs** with an integer-only NumPy "golden model" (`x @ W1 → sign → @ W2 → argmax`) on the full test set and prints its accuracy next to the PyTorch accuracy.
-5. **Writes golden test vectors** for the C++ simulator: the first 100 binarized test images, their expected integer logits and their labels.
+1. Downloads MNIST into `./data/` (excluded from Git).
+2. Trains a 784-256-10 binarized multilayer perceptron for 20 epochs (batch size 128, Adam optimizer, cosine learning-rate schedule, random seed 0). The sign function is trained with a straight-through estimator. The layers have no bias and no batch normalization, so each layer maps directly onto one crossbar array. A GPU is used if available.
+3. Exports each layer's binarized weights in crossbar layout: rows are inputs (word lines) and columns are outputs (bit lines). Layer 1 is 784 x 256 and layer 2 is 256 x 10. Two files are written per layer:
+   - `layerN_weights.csv`: values +1/-1
+   - `layerN_weights_bin.csv`: values 0/1
+4. Re-runs inference on the full test set with integer-only NumPy code using the exported files, and prints the resulting accuracy.
+5. Writes the reference test vectors for the C++ simulator: 100 binarized test images, their expected output scores (logits) and their labels.
 
-> ⚠️ Running `main.py` **overwrites** the committed CSV files in the repository root. Results can differ slightly between machines (for example GPU vs. CPU). The test vectors are regenerated together with the weights, so the C++ regression test stays consistent.
+Note: running `main.py` overwrites the CSV files in the repository root. Exact weights may differ between machines (for example GPU vs. CPU). The test vectors are regenerated together with the weights, so the C++ test remains consistent.
 
-## 2. Build and run the C++ simulator
+## 2. Building and running the C++ simulator
 
-Requirements: a C++17 compiler (g++ or clang++) and CMake ≥ 3.10.
+Requirements: a C++17 compiler (g++ or clang++) and CMake 3.10 or newer.
 
 ```bash
 cmake -S simulator_core -B simulator_core/build
 cmake --build simulator_core/build
-./simulator_core/build/bnn_sim          # run from the repository root
+./simulator_core/build/bnn_sim
 ```
 
-The simulator loads both weight matrices into `VirtualCrossbar` instances and runs ideal (noise-free) inference on the golden test vectors. It compares the logits with `test_expected_logits.csv`. It exits with code `0` only if all logits match exactly, so it doubles as a regression test. Optional arguments: `bnn_sim <layer1.csv> <layer2.csv>`.
+Run the binary from the repository root so it can find the CSV files. Alternative weight files can be passed as arguments: `bnn_sim <layer1.csv> <layer2.csv>`.
+
+The program loads both weight matrices and runs ideal inference on the 100 reference images. It then compares every output score with `test_expected_logits.csv` and reports the classification accuracy. The exit code is 0 only when all outputs match exactly.
 
 Expected output (abridged):
 
@@ -69,12 +61,12 @@ Ideal inference on 100 test samples:
 [PASS] Simulator is bit-exact with the golden reference.
 ```
 
-## Status
+## Testing
 
-- ✅ BNN trained (94.30% MNIST test accuracy) and weights exported
-- ✅ C++ crossbar core with ideal inference, bit-exact with the golden reference
-- ⬜ MTJ resistance/current model and noise injection (next milestone)
+Regression testing is manual; there is no automated CI. Before pushing changes, build the simulator, run `bnn_sim` and confirm that it prints `[PASS]`.
 
-## Contributing
+## Current status
 
-Each team member commits their own work with descriptive messages. Before pushing, run `bnn_sim` and confirm the `[PASS]` line. There is no automated CI; this check is manual.
+- Done: BNN trained (94.30% MNIST test accuracy); weights and test vectors exported.
+- Done: C++ crossbar data structure and ideal inference, matching the reference outputs exactly.
+- Next: MTJ resistance and current model, and statistical noise injection.

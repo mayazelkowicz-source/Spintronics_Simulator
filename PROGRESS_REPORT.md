@@ -6,7 +6,7 @@ This document tracks the development milestones of the Binarized Neural Network 
 
 **Status:** Completed
 
-* Completed a comprehensive theoretical study of the Spintronics course materials provided by Prof. Amir Capua.
+* Completed a comprehensive theoretical study of the Spintronics course materials provided by Dr. Amir Capua.
 
 
 * Researched the fundamental physics of magnetic memory devices, including spin dynamics, exchange interaction, magnetic domains, and single-domain particle behavior.

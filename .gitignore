@@ -7,7 +7,3 @@ simulator_core/build/
 .venv/
 __pycache__/
 data/
-PythonProject/data/
-
-# Internal project memory (local only)
-PROJECT_STATE.md

@@ -32,6 +32,7 @@ This document tracks the development milestones of the Binarized Neural Network 
 * **Data Mapping:** Implemented file-parsing mechanisms to load and map the extracted binary CSV weights directly into the virtual MTJ crossbar matrix.
 * **Ideal Forward Pass:** Implemented matrix-vector multiplication (dot product) and sign activation functions for multi-layer inference.
 * **Verification:** Built a regression testing suite (`main.cpp`) that processes the 100 golden test vectors through the C++ simulator. The simulator achieved a 100% computational match with the golden reference model and successfully classified 96/100 images under ideal, noise-free conditions.
+* **Full Test-Set Verification:** Exported all 10,000 MNIST test images with `export_full_test.py`. The C++ simulator matched the golden reference on 10,000 of 10,000 images, with 94.30% accuracy in both Python and C++.
 
 ## Next Steps (Milestone 3)
 

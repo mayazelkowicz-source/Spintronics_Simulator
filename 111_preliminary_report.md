@@ -115,7 +115,7 @@ Figure 1 shows the physics behind the Noise Injector: in (a) the free layer prec
 ## 5. Annual Work Plan
 
 **First steps, November–December 2026 (essential):**
-- Golden-reference verification on all 10,000 test images.
+- Golden-reference verification on all 10,000 test images (done).
 - MTJ resistance mapping and bit-line current summation.
 - Collecting device parameters from the Spintronics Lab.
 

@@ -8,6 +8,7 @@ This repository contains a simulator for running a Binarized Neural Network (BNN
 ## Repository contents
 
 - `main.py`: trains the BNN on MNIST with PyTorch and exports the weights and test vectors.
+- `export_full_test.py`: exports the full 10,000-image test set from the existing weights, without retraining, and checks the first 100 samples against the committed test vectors.
 - `layer1_weights.csv`, `layer2_weights.csv`: binarized weights, values +1/-1.
 - `layer1_weights_bin.csv`, `layer2_weights_bin.csv`: the same weights in 0/1 encoding (1 = +1, 0 = -1).
 - `test_inputs_pm1.csv`, `test_expected_logits.csv`, `test_labels.csv`: reference test vectors for the first 100 MNIST test images.
@@ -48,7 +49,7 @@ cmake --build simulator_core/build
 ./simulator_core/build/bnn_sim
 ```
 
-Run the binary from the repository root so it can find the CSV files. Alternative weight files can be passed as arguments: `bnn_sim <layer1.csv> <layer2.csv>`.
+Run the binary from the repository root so it can find the CSV files. Alternative weight files can be passed as arguments: `bnn_sim <layer1.csv> <layer2.csv> [test_dir]`.
 
 The program loads both weight matrices and runs ideal inference on the 100 reference images. It then compares every output score with `test_expected_logits.csv` and reports the classification accuracy. The exit code is 0 only when all outputs match exactly.
 
@@ -61,6 +62,17 @@ Ideal inference on 100 test samples:
 [PASS] Simulator is bit-exact with the golden reference.
 ```
 
+## 3. Full test-set verification
+
+Run from the repository root, after building the simulator:
+
+```bash
+.venv/bin/python export_full_test.py
+./simulator_core/build/bnn_sim layer1_weights_bin.csv layer2_weights_bin.csv full_test
+```
+
+The script downloads MNIST into `./data/` if needed and writes the test files to `full_test/` (excluded from Git). Result: logits match the reference on 10,000 of 10,000 images, with 94.30% accuracy in both Python and C++.
+
 ## Testing
 
 Regression testing is manual; there is no automated CI. Before pushing changes, build the simulator, run `bnn_sim` and confirm that it prints `[PASS]`.
@@ -68,5 +80,5 @@ Regression testing is manual; there is no automated CI. Before pushing changes, 
 ## Current status
 
 - Done: BNN trained (94.30% MNIST test accuracy); weights and test vectors exported.
-- Done: C++ crossbar data structure and ideal inference, matching the reference outputs exactly.
+- Done: C++ crossbar data structure and ideal inference, matching the reference outputs exactly on all 10,000 MNIST test images.
 - Next: MTJ resistance and current model, and statistical noise injection.

@@ -1,12 +1,16 @@
-// Stage 3: ideal integer inference plus the noise-free analog MTJ model.
+// Stage 4: ideal integer inference, the analog MTJ model and the Noise Injector.
 //
 // Loads both layers, runs the 784 -> 256 -> 10 BNN on the golden test vectors and
 // checks the logits bit-exactly against the reference produced by the training
 // script (numpy_golden_inference in main.py). The same network is then run on the
-// analog MTJ crossbars (P/AP differential pairs, bit-line currents), which must
-// predict the same class as the integer model for every sample.
+// analog MTJ crossbars (P/AP differential pairs, bit-line currents).
+//   Noise off (default): the analog model must predict the same class as the
+//                        integer model for every sample.
+//   Noise on:            the analog model runs on noisy crossbars and the program
+//                        reports its accuracy and the drop from the noise-free accuracy.
 //
 // Usage: bnn_sim [layer1.csv] [layer2.csv] [test_dir]
+//                [--sigma S] [--p P] [--flip-mode cell|weight] [--seed N]
 // Defaults assume the binary is run from the project root.
 
 #include <algorithm>
@@ -15,12 +19,15 @@
 #include <cstddef>
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "CliOptions.h"
 #include "CsvUtils.h"
 #include "MTJCrossbar.h"
 #include "MTJParams.h"
+#include "NoiseInjector.h"
 #include "VirtualCrossbar.h"
 
 namespace {
@@ -68,9 +75,21 @@ constexpr double kMaxLatticeDeviation = 0.25;
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    const std::string layer1Path = argc > 1 ? argv[1] : "layer1_weights_bin.csv";
-    const std::string layer2Path = argc > 2 ? argv[2] : "layer2_weights_bin.csv";
-    const std::string testDir = argc > 3 ? std::string(argv[3]) + "/" : "";
+    CliOptions opts;
+    try {
+        opts = parseCliOptions(std::vector<std::string>(argv + 1, argv + argc));
+    } catch (const std::exception& e) {
+        std::cerr << "[ERROR] " << e.what() << "\n" << cliUsage(argv[0]);
+        return 1;
+    }
+    if (opts.help) {
+        std::cout << cliUsage(argv[0]);
+        return 0;
+    }
+    const std::string& layer1Path = opts.layer1Path;
+    const std::string& layer2Path = opts.layer2Path;
+    const std::string& testDir = opts.testDir;
+    const bool noiseOn = opts.noiseEnabled();
 
     try {
         VirtualCrossbar layer1("Layer1", kInputSize, kHiddenSize);
@@ -81,8 +100,8 @@ int main(int argc, char* argv[]) {
         std::cout << "All crossbars loaded successfully.\n\n";
 
         const MTJParams mtjParams;  // PLACEHOLDER device values, see MTJParams.h
-        const MTJCrossbar mtj1(layer1, mtjParams);
-        const MTJCrossbar mtj2(layer2, mtjParams);
+        MTJCrossbar mtj1(layer1, mtjParams);
+        MTJCrossbar mtj2(layer2, mtjParams);
         const double unitCurrent = mtjParams.unitCurrent();
         std::cout << "MTJ device model (PLACEHOLDER values, not lab data):\n"
                   << "  V_read = " << mtjParams.vRead << " V, R_P = " << mtjParams.rP
@@ -92,6 +111,19 @@ int main(int argc, char* argv[]) {
                   << "  Physical MTJ devices (two per weight): " << mtj1.name() << " "
                   << mtj1.deviceCount() << ", " << mtj2.name() << " " << mtj2.deviceCount()
                   << ", total " << mtj1.deviceCount() + mtj2.deviceCount() << "\n\n";
+
+        if (noiseOn) {
+            NoiseInjector injector(opts.seed);
+            injector.add(std::make_unique<ResistanceVariation>(opts.sigma));
+            injector.add(std::make_unique<BitFlip>(opts.p, opts.flipMode));
+            injector.apply(mtj1);
+            injector.apply(mtj2);
+            std::cout << "Noise Injector (seed " << injector.seed() << "):\n";
+            for (const auto& model : injector.models()) {
+                std::cout << "  " << model->describe() << '\n';
+            }
+            std::cout << '\n';
+        }
 
         const auto inputs = readIntCsv(testDir + kTestInputsPath);
         const auto expected = readIntCsv(testDir + kExpectedLogitsPath);
@@ -120,10 +152,12 @@ int main(int argc, char* argv[]) {
             const std::vector<double> diff2 = mtj2.forward(hidden).difference();
             const std::size_t analogClass = senseArgmax(diff2, unitCurrent);
 
-            maxDeviation = std::max(maxDeviation,
-                                    latticeDeviation(diff1, layer1.forward(x), unitCurrent));
-            maxDeviation = std::max(maxDeviation,
-                                    latticeDeviation(diff2, layer2.forward(hidden), unitCurrent));
+            if (!noiseOn) {
+                maxDeviation = std::max(
+                    maxDeviation, latticeDeviation(diff1, layer1.forward(x), unitCurrent));
+                maxDeviation = std::max(
+                    maxDeviation, latticeDeviation(diff2, layer2.forward(hidden), unitCurrent));
+            }
             if (analogClass == intClass) ++analogClassMatches;
             if (static_cast<int32_t>(analogClass) == labels[i].at(0)) ++analogCorrect;
         }
@@ -141,6 +175,25 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         std::cout << "[PASS] Simulator is bit-exact with the golden reference.\n\n";
+
+        if (noiseOn) {
+            // The noise-free analog model predicts the integer model's class for every
+            // image (checked by the default run), so its accuracy is the integer one.
+            const double cleanAcc = 100.0 * static_cast<double>(correct) / static_cast<double>(n);
+            const double noisyAcc =
+                100.0 * static_cast<double>(analogCorrect) / static_cast<double>(n);
+            std::cout << "Analog MTJ inference (noise on) on " << n << " test samples:\n"
+                      << "  Classes matching integer model:   " << analogClassMatches << " / "
+                      << n << '\n'
+                      << "  Classification accuracy:          " << analogCorrect << " / " << n
+                      << " (" << noisyAcc << "%)\n"
+                      << "  Noise-free accuracy:              " << correct << " / " << n << " ("
+                      << cleanAcc << "%)\n"
+                      << "  Accuracy drop:                    " << cleanAcc - noisyAcc
+                      << " percentage points\n"
+                      << "  Run time (integer + analog):      " << seconds << " s\n";
+            return 0;
+        }
 
         std::cout << "Analog MTJ inference (noise off) on " << n << " test samples:\n"
                   << "  Classes matching integer model:   " << analogClassMatches << " / " << n

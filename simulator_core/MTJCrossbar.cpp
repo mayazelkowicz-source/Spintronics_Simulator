@@ -3,6 +3,7 @@
 
 #include "MTJCrossbar.h"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -18,7 +19,9 @@ MTJCrossbar::MTJCrossbar(const VirtualCrossbar& weights, const MTJParams& params
       cols_(weights.cols()),
       params_(params),
       gPos_(rows_ * cols_),
-      gNeg_(rows_ * cols_) {
+      gNeg_(rows_ * cols_),
+      parallelPos_(rows_ * cols_),
+      parallelNeg_(rows_ * cols_) {
     params_.validate();
     const double gP = params_.gP();
     const double gAP = params_.gAP();
@@ -27,10 +30,49 @@ MTJCrossbar::MTJCrossbar(const VirtualCrossbar& weights, const MTJParams& params
     for (std::size_t r = 0; r < rows_; ++r) {
         for (std::size_t c = 0; c < cols_; ++c) {
             const bool plus = weights.at(r, c) == 1;
-            gPos_[r * cols_ + c] = plus ? gP : gAP;
-            gNeg_[r * cols_ + c] = plus ? gAP : gP;
+            const std::size_t i = r * cols_ + c;
+            gPos_[i] = plus ? gP : gAP;
+            gNeg_[i] = plus ? gAP : gP;
+            parallelPos_[i] = plus ? 1 : 0;
+            parallelNeg_[i] = plus ? 0 : 1;
         }
     }
+}
+
+std::size_t MTJCrossbar::index(std::size_t row, std::size_t col) const {
+    if (row >= rows_ || col >= cols_) {
+        throw std::out_of_range("MTJCrossbar '" + name_ + "': cell (" + std::to_string(row) +
+                                ", " + std::to_string(col) + ") out of range");
+    }
+    return row * cols_ + col;
+}
+
+double MTJCrossbar::conductance(std::size_t row, std::size_t col, BitLine line) const {
+    const std::size_t i = index(row, col);
+    return line == BitLine::Positive ? gPos_[i] : gNeg_[i];
+}
+
+void MTJCrossbar::setConductance(std::size_t row, std::size_t col, BitLine line, double g) {
+    const std::size_t i = index(row, col);
+    if (!std::isfinite(g) || !(g > 0.0)) {
+        throw std::invalid_argument("MTJCrossbar '" + name_ +
+                                    "': conductance must be finite and > 0");
+    }
+    (line == BitLine::Positive ? gPos_[i] : gNeg_[i]) = g;
+}
+
+bool MTJCrossbar::isParallel(std::size_t row, std::size_t col, BitLine line) const {
+    const std::size_t i = index(row, col);
+    return (line == BitLine::Positive ? parallelPos_[i] : parallelNeg_[i]) != 0;
+}
+
+void MTJCrossbar::flipCell(std::size_t row, std::size_t col, BitLine line) {
+    const std::size_t i = index(row, col);
+    double& g = line == BitLine::Positive ? gPos_[i] : gNeg_[i];
+    uint8_t& parallel = line == BitLine::Positive ? parallelPos_[i] : parallelNeg_[i];
+    const double ratio = 1.0 + params_.tmr;  // R_AP / R_P = G_P / G_AP
+    g = parallel ? g / ratio : g * ratio;
+    parallel = parallel ? 0 : 1;
 }
 
 BitLineCurrents MTJCrossbar::forward(const std::vector<int8_t>& input) const {

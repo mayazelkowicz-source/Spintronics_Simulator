@@ -12,7 +12,7 @@ This repository contains a simulator for running a Binarized Neural Network (BNN
 - `layer1_weights.csv`, `layer2_weights.csv`: binarized weights, values +1/-1.
 - `layer1_weights_bin.csv`, `layer2_weights_bin.csv`: the same weights in 0/1 encoding (1 = +1, 0 = -1).
 - `test_inputs_pm1.csv`, `test_expected_logits.csv`, `test_labels.csv`: reference test vectors for the first 100 MNIST test images.
-- `simulator_core/`: C++17 simulator (crossbar data structure, ideal forward pass, regression test).
+- `simulator_core/`: C++17 simulator (crossbar data structure, ideal integer forward pass, noise-free MTJ device model, regression test).
 - `111_preliminary_report.md`, `111_preliminary_report.pdf`: Milestone 1 report.
 - `PROGRESS_REPORT.md`: milestone summary.
 
@@ -51,15 +51,30 @@ cmake --build simulator_core/build
 
 Run the binary from the repository root so it can find the CSV files. Alternative weight files can be passed as arguments: `bnn_sim <layer1.csv> <layer2.csv> [test_dir]`.
 
-The program loads both weight matrices and runs ideal inference on the 100 reference images. It then compares every output score with `test_expected_logits.csv` and reports the classification accuracy. The exit code is 0 only when all outputs match exactly.
+The program loads both weight matrices and runs ideal inference on the 100 reference images. It then compares every output score with `test_expected_logits.csv` and reports the classification accuracy.
+
+It then runs the same network on the MTJ device model (`MTJParams.h`, `MTJCrossbar.h/.cpp`). Each weight is stored in a pair of MTJ cells on two bit lines: +1 puts the first cell in the Parallel (low resistance) state and the second in the Anti-Parallel (high resistance) state, and -1 does the opposite. Inputs are applied as +V_read or -V_read. The difference between the two bit-line currents is proportional to the integer column sum, so the input-dependent offset cancels. The sense step compares against half of one unit current (the current of a column sum of 1), which keeps sign(0) = +1 and exact ties in the final class identical to the integer model despite floating-point rounding. The values of V_read, R_P and TMR in `MTJParams.h` are placeholders from typical published values, to be replaced with lab data. Noise is not modeled yet.
+
+The exit code is 0 only when all integer outputs match exactly and the MTJ model predicts the same class as the integer model for every image.
 
 Expected output (abridged):
 
 ```
+MTJ device model (PLACEHOLDER values, not lab data):
+  V_read = 0.1 V, R_P = 5000 ohm, TMR = 100%, R_AP = 10000 ohm
+  Unit current (one P/AP pair at V_read) = 1e-05 A
+  Physical MTJ devices (two per weight): Layer1 401408, Layer2 5120, total 406528
+
 Ideal inference on 100 test samples:
   Logits matching golden reference: 100 / 100
   Classification accuracy:          96 / 100 (96%)
 [PASS] Simulator is bit-exact with the golden reference.
+
+Analog MTJ inference (noise off) on 100 test samples:
+  Classes matching integer model:   100 / 100
+  Classification accuracy:          96 / 100 (96%)
+  ...
+[PASS] Analog MTJ model predicts the same class as the integer model.
 ```
 
 ## 3. Full test-set verification
@@ -71,14 +86,15 @@ Run from the repository root, after building the simulator:
 ./simulator_core/build/bnn_sim layer1_weights_bin.csv layer2_weights_bin.csv full_test
 ```
 
-The script downloads MNIST into `./data/` if needed and writes the test files to `full_test/` (excluded from Git). Result: logits match the reference on 10,000 of 10,000 images, with 94.30% accuracy in both Python and C++.
+The script downloads MNIST into `./data/` if needed and writes the test files to `full_test/` (excluded from Git). Result: logits match the reference on 10,000 of 10,000 images, with 94.30% accuracy in both Python and C++. The MTJ device model predicts the same class as the integer model on 10,000 of 10,000 images.
 
 ## Testing
 
-Regression testing is manual; there is no automated CI. Before pushing changes, build the simulator, run `bnn_sim` and confirm that it prints `[PASS]`.
+Regression testing is manual; there is no automated CI. Before pushing changes, build the simulator, run `bnn_sim` and confirm that it prints both `[PASS]` lines.
 
 ## Current status
 
 - Done: BNN trained (94.30% MNIST test accuracy); weights and test vectors exported.
 - Done: C++ crossbar data structure and ideal inference, matching the reference outputs exactly on all 10,000 MNIST test images.
-- Next: MTJ resistance and current model, and statistical noise injection.
+- Done: noise-free MTJ device model (P/AP differential pairs, bit-line currents), matching the integer model's predicted class on all 10,000 test images.
+- Next: replace the placeholder device values with lab data, and add statistical noise injection.

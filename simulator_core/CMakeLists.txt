@@ -13,5 +13,6 @@ add_executable(bnn_sim
     VirtualCrossbar.cpp
     VirtualCrossbarInference.cpp
     CsvUtils.cpp
+    MTJCrossbar.cpp
 )
 target_compile_options(bnn_sim PRIVATE -Wall -Wextra -Wpedantic)

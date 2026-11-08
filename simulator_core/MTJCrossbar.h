@@ -30,14 +30,29 @@ struct BitLineCurrents {
 // the integer column sum of VirtualCrossbar::forward(). The input-dependent common
 // current cancels in the difference.
 //
-// Conductances are stored per cell so that noise models can later modify
-// individual devices.
+// Conductances and magnetic states are stored per cell so that noise models
+// (NoiseInjector.h) can modify individual devices.
 class MTJCrossbar {
 public:
+    // Which of the two devices of a weight's differential pair.
+    enum class BitLine { Positive, Negative };
+
     MTJCrossbar(const VirtualCrossbar& weights, const MTJParams& params);
 
-    // Analog, noise-free read. input must have rows() entries, each +1 or -1.
+    // Analog read with the currently stored conductances. input must have rows()
+    // entries, each +1 or -1.
     BitLineCurrents forward(const std::vector<int8_t>& input) const;
+
+    // Per-device access. Throws std::out_of_range for an invalid (row, col).
+    double conductance(std::size_t row, std::size_t col, BitLine line) const;
+    // Throws std::invalid_argument unless g is finite and > 0.
+    void setConductance(std::size_t row, std::size_t col, BitLine line, double g);
+    bool isParallel(std::size_t row, std::size_t col, BitLine line) const;
+
+    // Switches the device between P and AP. Its conductance is divided by (1 + TMR)
+    // for P -> AP and multiplied by (1 + TMR) for AP -> P, so a device keeps its own
+    // variation factor and its R_AP / R_P ratio stays equal to 1 + TMR.
+    void flipCell(std::size_t row, std::size_t col, BitLine line);
 
     std::size_t rows() const { return rows_; }
     std::size_t cols() const { return cols_; }
@@ -48,12 +63,16 @@ public:
     std::size_t deviceCount() const { return 2 * rows_ * cols_; }
 
 private:
+    std::size_t index(std::size_t row, std::size_t col) const;
+
     std::string name_;
     std::size_t rows_;
     std::size_t cols_;
     MTJParams params_;
     std::vector<double> gPos_;  // row-major conductances on the positive bit lines [S]
     std::vector<double> gNeg_;  // row-major conductances on the negative bit lines [S]
+    std::vector<uint8_t> parallelPos_;  // row-major: 1 = Parallel, 0 = Anti-Parallel
+    std::vector<uint8_t> parallelNeg_;
 };
 
 // Sense amplifier between layers. Returns +1 if diff >= -0.5 * unitCurrent, else -1.
